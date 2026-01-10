@@ -10,6 +10,7 @@ import com.priyansh.notification_system.entity.Notification;
 import com.priyansh.notification_system.entity.NotificationStatus;
 import com.priyansh.notification_system.repository.NotificationRepository;
 import com.priyansh.notification_system.services.NotificationService;
+import com.priyansh.notification_system.services.async.NotificationAsyncService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -18,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final NotificationAsyncService notificationAsyncService;
 
     @Override
     public NotificationResponse createNotification(CreateNotificationRequest request) {
@@ -29,6 +31,9 @@ public class NotificationServiceImpl implements NotificationService {
         notification.setStatus(NotificationStatus.PENDING);
 
         notification = notificationRepository.save(notification);
+
+        // Trigger async processing
+        notificationAsyncService.processNotificationAsync(notification.getId());
 
         return new NotificationResponse(
                 notification.getId(),
