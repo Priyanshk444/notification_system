@@ -16,11 +16,13 @@ public class EmailNotificationSender implements NotificationSender {
     private final JavaMailSender mailSender;
 
     @Override
-    public void send(Notification notification) {
+    public void send(Notification notification, String recipientEmail) {
         // Implementation for sending email notification
         SimpleMailMessage message = new SimpleMailMessage();
 
-        message.setTo("priyanshkumar444@gmail.com");
+        // message.setTo("priyanshkumar444@gmail.com");
+        message.setTo(recipientEmail);
+
         message.setSubject(
                 notification.getTitle() != null
                         ? notification.getTitle()

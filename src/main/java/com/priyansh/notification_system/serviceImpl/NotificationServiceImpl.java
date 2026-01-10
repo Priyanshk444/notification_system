@@ -1,6 +1,7 @@
 package com.priyansh.notification_system.serviceImpl;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
@@ -23,12 +24,32 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public NotificationResponse createNotification(CreateNotificationRequest request) {
+
+        if (request.getIdempotencyKey() != null) {
+            Optional<Notification> existing =
+                notificationRepository.findByIdempotencyKey(
+                        request.getIdempotencyKey()
+                );
+
+                if (existing.isPresent()) {
+                    Notification n = existing.get();
+                    return new NotificationResponse(
+                            n.getId(),
+                            n.getTitle(),
+                            n.getContent(),
+                            n.getType(),
+                            n.getStatus()
+                    );
+                }
+        }
+
         Notification notification = new Notification();
         notification.setUserId(request.getUserId());
         notification.setContent(request.getContent());
         notification.setTitle(request.getTitle());
         notification.setType(request.getType());
         notification.setStatus(NotificationStatus.PENDING);
+        notification.setIdempotencyKey(request.getIdempotencyKey());
 
         notification = notificationRepository.save(notification);
 
