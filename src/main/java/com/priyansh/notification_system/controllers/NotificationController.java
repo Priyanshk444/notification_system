@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.priyansh.notification_system.dto.CreateNotificationRequest;
 import com.priyansh.notification_system.dto.NotificationResponse;
+import com.priyansh.notification_system.metrics.NotificationMetrics;
 import com.priyansh.notification_system.services.NotificationService;
 import com.priyansh.notification_system.services.ratelimit.RateLimiterService;
 
@@ -24,6 +25,7 @@ public class NotificationController {
 
     private final NotificationService notificationService;
     private final RateLimiterService rateLimiterService;
+    private final NotificationMetrics metrics;
 
     @PostMapping()
     public ResponseEntity<NotificationResponse> createNotification(@Valid @RequestBody CreateNotificationRequest request) {
@@ -32,12 +34,17 @@ public class NotificationController {
         boolean allowed = rateLimiterService.allowRequest(request.getUserId());
 
         if (!allowed) {
+
+            metrics.incrementRateLimited();
+
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .body(null);
         }
 
         NotificationResponse response =
                 notificationService.createNotification(request);
+
+        metrics.incrementCreated();
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

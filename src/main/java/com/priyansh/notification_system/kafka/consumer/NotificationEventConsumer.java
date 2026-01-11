@@ -12,6 +12,7 @@ import com.priyansh.notification_system.entity.NotificationDeliveryLog;
 import com.priyansh.notification_system.entity.NotificationStatus;
 import com.priyansh.notification_system.entity.User;
 import com.priyansh.notification_system.kafka.producer.NotificationDlqProducer;
+import com.priyansh.notification_system.metrics.NotificationMetrics;
 import com.priyansh.notification_system.repository.NotificationDeliveryLogRepository;
 import com.priyansh.notification_system.repository.NotificationRepository;
 import com.priyansh.notification_system.repository.UserRepository;
@@ -30,6 +31,7 @@ public class NotificationEventConsumer {
     private final NotificationDeliveryLogRepository notificationDeliveryLogRepository;
     private final NotificationSender emailNotificationSender;
     private final NotificationDlqProducer notificationDlqProducer;
+    private final NotificationMetrics metrics;
 
     @KafkaListener(topics = "notification.send", groupId = "notification-consumers")
     @Transactional
@@ -96,6 +98,9 @@ public class NotificationEventConsumer {
             notification.setStatus(NotificationStatus.SENT);
             notificationRepository.save(notification);
 
+            metrics.incrementSentSuccess();
+
+
             log.info("Notification {} sent successfully", notificationId);
 
         } catch (Exception ex) {
@@ -112,6 +117,8 @@ public class NotificationEventConsumer {
             notification.setRetryCount(attempt);
             notification.setStatus(NotificationStatus.FAILED);
             notificationRepository.save(notification);
+
+            metrics.incrementSentFailed();
 
             log.error(
                     "Notification {} failed on attempt {}",

@@ -97,6 +97,18 @@
 			<artifactId>jackson-databind</artifactId>
 		</dependency>
 
+		<!-- Actuator (required for metrics) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+
+		<!-- Micrometer core (already included, but explicit is fine) -->
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-core</artifactId>
+		</dependency>
+
 	</dependencies>
 
 	<build>
