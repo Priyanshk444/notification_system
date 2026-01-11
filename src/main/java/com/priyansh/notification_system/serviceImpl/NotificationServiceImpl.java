@@ -9,6 +9,7 @@ import com.priyansh.notification_system.dto.CreateNotificationRequest;
 import com.priyansh.notification_system.dto.NotificationResponse;
 import com.priyansh.notification_system.entity.Notification;
 import com.priyansh.notification_system.entity.NotificationStatus;
+import com.priyansh.notification_system.kafka.producer.NotificationEventProducer;
 import com.priyansh.notification_system.repository.NotificationRepository;
 import com.priyansh.notification_system.services.NotificationService;
 import com.priyansh.notification_system.services.async.NotificationAsyncService;
@@ -20,7 +21,8 @@ import lombok.RequiredArgsConstructor;
 public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
-    private final NotificationAsyncService notificationAsyncService;
+    // private final NotificationAsyncService notificationAsyncService;
+    private final NotificationEventProducer notificationEventProducer;
 
     @Override
     public NotificationResponse createNotification(CreateNotificationRequest request) {
@@ -53,8 +55,12 @@ public class NotificationServiceImpl implements NotificationService {
 
         notification = notificationRepository.save(notification);
 
-        // Trigger async processing
-        notificationAsyncService.processNotificationAsync(notification.getId());
+        // // Trigger async processing
+        // notificationAsyncService.processNotificationAsync(notification.getId());
+
+        // Publish event instead of async call
+        notificationEventProducer.publishNotification(notification.getId());
+
 
         return new NotificationResponse(
                 notification.getId(),

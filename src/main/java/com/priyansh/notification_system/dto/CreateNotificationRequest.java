@@ -2,7 +2,6 @@ package com.priyansh.notification_system.dto;
 
 import com.priyansh.notification_system.entity.NotiicationType;
 
-import jakarta.persistence.Column;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
