@@ -11,6 +11,7 @@ import com.priyansh.notification_system.entity.Notification;
 import com.priyansh.notification_system.entity.NotificationDeliveryLog;
 import com.priyansh.notification_system.entity.NotificationStatus;
 import com.priyansh.notification_system.entity.User;
+import com.priyansh.notification_system.kafka.producer.NotificationDlqProducer;
 import com.priyansh.notification_system.repository.NotificationDeliveryLogRepository;
 import com.priyansh.notification_system.repository.NotificationRepository;
 import com.priyansh.notification_system.repository.UserRepository;
@@ -28,41 +29,50 @@ public class NotificationEventConsumer {
     private final UserRepository userRepository;
     private final NotificationDeliveryLogRepository notificationDeliveryLogRepository;
     private final NotificationSender emailNotificationSender;
+    private final NotificationDlqProducer notificationDlqProducer;
 
-    @KafkaListener(
-        topics = "notification.send",
-        groupId = "notification-consumers"
-    )
+    @KafkaListener(topics = "notification.send", groupId = "notification-consumers")
     @Transactional
-    public void consume(String Message){
-         
+    public void consume(String Message) {
+
         Long notificationId = Long.parseLong(Message);
 
         log.info("Consumed notification event. notificationId={}", notificationId);
 
         // Retry Locking (atomic)
         int updated = notificationRepository.updateStatusIfAllowed(
-            notificationId, NotificationStatus.PROCESSING, 
-            List.of(NotificationStatus.PENDING, NotificationStatus.FAILED));
+                notificationId, NotificationStatus.PROCESSING,
+                List.of(NotificationStatus.PENDING, NotificationStatus.FAILED));
 
-        if (updated == 0){
+        if (updated == 0) {
             log.info(
-                "Notification {} already being processed by another worker",
-                notificationId
-            );
+                    "Notification {} already being processed by another worker",
+                    notificationId);
             return;
         }
 
         Notification notification = notificationRepository.findById(notificationId)
-            .orElseThrow(() -> new IllegalStateException("Notification not found with id: " + notificationId));
+                .orElseThrow(() -> new IllegalStateException("Notification not found with id: " + notificationId));
 
-         int attempt = notification.getRetryCount() + 1;
+        int attempt = notification.getRetryCount() + 1;
 
         try {
             // Check retry limit
             if (notification.getRetryCount() >= notification.getMaxRetries()) {
-                log.warn("Notification {} exceeded max retries", notificationId);
+
+                notification.setStatus(NotificationStatus.FAILED);
+                notificationRepository.save(notification);
+
+                notificationDlqProducer.sendtoDlq(
+                        notificationId,
+                        "Max retries exceeded");
+
+                log.error(
+                        "Notification {} permanently failed and sent to DLQ",
+                        notificationId);
+
                 return;
+
             }
 
             // Fetch user
@@ -80,9 +90,7 @@ public class NotificationEventConsumer {
                             attempt,
                             DeliveryStatus.SUCCESS,
                             null,
-                            null
-                    )
-            );
+                            null));
 
             // Mark SENT
             notification.setStatus(NotificationStatus.SENT);
@@ -99,20 +107,17 @@ public class NotificationEventConsumer {
                             attempt,
                             DeliveryStatus.FAILED,
                             ex.getMessage(),
-                            null
-                    )
-            );
+                            null));
 
             notification.setRetryCount(attempt);
             notification.setStatus(NotificationStatus.FAILED);
             notificationRepository.save(notification);
 
             log.error(
-                "Notification {} failed on attempt {}",
-                notificationId,
-                attempt,
-                ex
-            );
+                    "Notification {} failed on attempt {}",
+                    notificationId,
+                    attempt,
+                    ex);
 
             // Let Kafka re-deliver if needed
             throw ex;
